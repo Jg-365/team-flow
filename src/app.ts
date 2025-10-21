@@ -6,6 +6,7 @@ import swaggerUi from "@fastify/swagger-ui";
 import { env } from "./config/env";
 import { errorHandler } from "./middlewares/error-handler";
 import { authRoutes } from "./routes/auth.routes";
+import { userRoutes } from "./routes/user.routes";
 
 export const app = fastify({
   logger: env.NODE_ENV === "development",
@@ -22,6 +23,8 @@ app.register(jwt, {
     expiresIn: env.JWT_EXPIRES_IN,
   },
 });
+
+app.register(userRoutes, { prefix: "/users" });
 
 app.register(swagger, {
   openapi: {

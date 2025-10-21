@@ -4,22 +4,14 @@ import { z } from "zod";
 import { AuthService } from "../services/auth.service";
 import { Role } from "@prisma/client";
 
-// Extend FastifyInstance to include 'jwt'
-declare module "fastify" {
-  interface FastifyInstance {
-    jwt: {
-      sign: (payload: any) => string;
-      verify: (token: string) => any;
-    };
-  }
-}
+// Remove manual FastifyInstance extension for 'jwt' to avoid type conflicts
 
 const authService = new AuthService();
 
 const registerSchema = z.object({
   name: z.string().min(3),
-  email: z.string().email(),
-  password: z.string().min(6),
+  email: z.email(),
+  password: z.string().min(8),
   role: z.enum(Role),
 });
 
@@ -30,7 +22,18 @@ const loginSchema = z.object({
 
 export class AuthController {
   async register(req: FastifyRequest, rep: FastifyReply) {
-    const body = registerSchema.parse(req.body);
+    let body;
+    try {
+      body = registerSchema.parse(req.body);
+    } catch (err) {
+      if (err instanceof z.ZodError) {
+        return rep.status(400).send({
+          message: "Invalid input",
+          issues: z.treeifyError(err),
+        });
+      }
+      throw err;
+    }
     try {
       const user = await authService.register(body as any);
       return rep.status(201).send({
@@ -50,7 +53,7 @@ export class AuthController {
     const body = loginSchema.parse(req.body);
     try {
       const user = await authService.login(body as any);
-      const token = req.server.jwt.sign({
+      const token = await (req as any).jwtSign({
         sub: user.id,
         role: user.role,
       });
